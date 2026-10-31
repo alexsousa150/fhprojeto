@@ -147,6 +147,10 @@ export const AtualizacaoModal: React.FC<AtualizacaoModalProps> = ({
             } else if (dataProg.concluido) {
               limparPolling();
               setEtapa('concluido');
+              setReiniciando(true);
+              setTimeout(() => {
+                aplicarEReiniciar();
+              }, 1200);
             }
           }
         } catch {
@@ -391,43 +395,20 @@ export const AtualizacaoModal: React.FC<AtualizacaoModalProps> = ({
                 <div className="space-y-1">
                   <h4 className="text-sm font-bold">Download Concluído com Sucesso!</h4>
                   <p className="text-xs text-emerald-800 leading-relaxed">
-                    O pacote da versão <strong className="text-stone-950">v{info?.versaoNova}</strong> foi baixado e verificado com segurança. O backup automático dos seus orçamentos foi concluído.
+                    O pacote da versão <strong className="text-stone-950">v{info?.versaoNova}</strong> foi baixado e verificado com segurança.
                   </p>
                 </div>
               </div>
 
-              {reiniciando ? (
-                <div className="p-4 bg-stone-100 rounded-xl text-center space-y-2 border border-stone-200">
-                  <RefreshCw className="w-6 h-6 text-[#D3A25D] animate-spin mx-auto" />
-                  <p className="text-xs font-bold text-stone-900">
-                    Iniciando instalador e reiniciando o sistema...
-                  </p>
-                  <p className="text-[11px] text-stone-500">
-                    O sistema reabrirá automaticamente em instantes na nova versão.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-xs text-stone-600">
-                    Ao clicar em <strong>"Atualizar e Reiniciar Agora"</strong>, o sistema será fechado para aplicar a instalação e reabrirá automaticamente atualizado.
-                  </p>
-                  <div className="flex justify-end space-x-2 pt-2">
-                    <button
-                      onClick={onClose}
-                      className="px-4 py-2 border border-stone-300 text-stone-700 hover:bg-stone-100 rounded-xl text-xs font-semibold transition-all"
-                    >
-                      Instalar Depois
-                    </button>
-                    <button
-                      onClick={aplicarEReiniciar}
-                      className="flex items-center space-x-2 px-5 py-2.5 bg-[#D3A25D] hover:bg-[#C2914A] text-stone-950 font-bold rounded-xl text-xs shadow-md shadow-[#D3A25D]/25 transition-all"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      <span>Atualizar e Reiniciar Agora</span>
-                    </button>
-                  </div>
-                </div>
-              )}
+              <div className="p-4 bg-stone-100 rounded-xl text-center space-y-2 border border-stone-200">
+                <RefreshCw className="w-6 h-6 text-[#D3A25D] animate-spin mx-auto" />
+                <p className="text-xs font-bold text-stone-900">
+                  Instalando atualização e reiniciando automaticamente...
+                </p>
+                <p className="text-[11px] text-stone-500">
+                  O instalador está atualizando os arquivos em segundo plano. O sistema reabrirá sozinho em instantes!
+                </p>
+              </div>
             </div>
           )}
 

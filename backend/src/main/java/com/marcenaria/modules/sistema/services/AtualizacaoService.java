@@ -275,11 +275,16 @@ public class AtualizacaoService {
 
             String scriptConteudo = "@echo off\r\n"
                     + "chcp 65001 > nul\r\n"
+                    + "title Atualizando Sistema FH Moveis...\r\n"
                     + "timeout /t 1 /nobreak > nul\r\n"
                     + "taskkill /F /IM GestaoMarcenaria.exe >nul 2>&1\r\n"
                     + "taskkill /F /IM javaw.exe >nul 2>&1\r\n"
                     + "timeout /t 1 /nobreak > nul\r\n"
-                    + "start \"\" \"" + instaladorBaixado.toAbsolutePath().toString() + "\"\r\n"
+                    + "start /wait \"\" \"" + instaladorBaixado.toAbsolutePath().toString() + "\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART\r\n"
+                    + "timeout /t 1 /nobreak > nul\r\n"
+                    + "if exist \"C:\\GestaoMarcenaria\\Iniciar-Silencioso.vbs\" (\r\n"
+                    + "    start \"\" wscript.exe \"C:\\GestaoMarcenaria\\Iniciar-Silencioso.vbs\"\r\n"
+                    + ")\r\n"
                     + "exit\r\n";
 
             Files.writeString(batScript, scriptConteudo, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);

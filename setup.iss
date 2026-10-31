@@ -28,7 +28,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\app.ico
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
-CloseApplications=yes
+CloseApplications=force
 RestartApplications=no
 
 [Languages]
@@ -60,4 +60,4 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "wscript.exe"; Parameters: """{app
 Name: "{commonstartup}\{#MyAppName}"; Filename: "wscript.exe"; Parameters: """{app}\Iniciar-Silencioso.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\app.ico"; Tasks: startup
 
 [Run]
-Filename: "wscript.exe"; Parameters: """{app}\Iniciar-Silencioso.vbs"""; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+Filename: "wscript.exe"; Parameters: """{app}\Iniciar-Silencioso.vbs"""; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall
