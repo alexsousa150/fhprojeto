@@ -1,0 +1,182 @@
+name: Publicar Release do Sistema
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Número da versão (ex: 1.0.2)'
+        required: true
+        default: '1.0.2'
+      releases_repo:
+        description: 'Repositório público de releases (ex: alexsousa150/fhprojeto-releases)'
+        required: false
+        default: 'alexsousa150/fhprojeto-releases'
+
+jobs:
+  build-and-release:
+    name: Compilar e Publicar Instalador Windows
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout do Código-Fonte
+        uses: actions/checkout@v4
+
+      - name: Definir Variáveis de Versão
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $tag = "${{ github.ref_name }}"
+            $ver = $tag -replace '^[vV]', ''
+          } else {
+            $ver = "${{ github.event.inputs.version }}"
+            $tag = "v$ver"
+          }
+          
+          # Define o repositório público de destino
+          $targetRepo = "${{ github.event.inputs.releases_repo }}"
+          if ([string]::IsNullOrWhiteSpace($targetRepo)) {
+            $targetRepo = "${{ vars.RELEASES_REPO }}"
+          }
+          if ([string]::IsNullOrWhiteSpace($targetRepo)) {
+            $targetRepo = "${{ github.repository }}-releases"
+          }
+          
+          echo "APP_VERSION=$ver" >> $env:GITHUB_ENV
+          echo "APP_TAG=$tag" >> $env:GITHUB_ENV
+          echo "TARGET_REPO=$targetRepo" >> $env:GITHUB_ENV
+          Write-Host "Compilando Versão: $ver (Tag: $tag) para o repositório de lançamentos: $targetRepo"
+
+      - name: Configurar Node.js (Frontend)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Build do Frontend (React + Vite)
+        shell: pwsh
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+          cd ..
+          
+          if (!(Test-Path "backend\src\main\resources\static")) {
+            New-Item -ItemType Directory -Path "backend\src\main\resources\static" -Force
+          }
+          Copy-Item -Path "frontend\dist\*" -Destination "backend\src\main\resources\static" -Recurse -Force
+          Write-Host "Frontend compilado e copiado para static com sucesso!"
+
+      - name: Configurar Java 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Atualizar Versão no POM do Backend
+        shell: pwsh
+        run: |
+          cd backend
+          mvn versions:set -DnewVersion="$env:APP_VERSION" -DgenerateBackupPoms=false
+          cd ..
+
+      - name: Build do Backend (Spring Boot JAR)
+        shell: pwsh
+        run: |
+          cd backend
+          mvn clean package -DskipTests
+          cd ..
+
+      - name: Instalar Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          echo "C:\Program Files (x86)\Inno Setup 6" >> $env:GITHUB_PATH
+
+      - name: Empacotar Aplicação com JPackage
+        shell: pwsh
+        run: |
+          if (Test-Path "dist-app\GestaoMarcenaria") {
+            Remove-Item -Recurse -Force "dist-app\GestaoMarcenaria"
+          }
+          
+          $jarFile = Get-ChildItem "backend\target\gestao-marcenaria-backend-*.jar" | Select-Object -First 1
+          if (!$jarFile) {
+            throw "JAR do backend não foi localizado em backend/target!"
+          }
+          
+          $inputDir = "dist-app-input"
+          if (Test-Path $inputDir) { Remove-Item -Recurse -Force $inputDir }
+          New-Item -ItemType Directory -Path $inputDir -Force | Out-Null
+          Copy-Item $jarFile.FullName -Destination $inputDir
+          
+          Write-Host "Executando jpackage para criar runtime e executavel GestaoMarcenaria.exe..."
+          jpackage `
+            --type app-image `
+            --dest dist-app `
+            --name GestaoMarcenaria `
+            --input $inputDir `
+            --main-jar $jarFile.Name `
+            --main-class org.springframework.boot.loader.launch.JarLauncher `
+            --icon app.ico `
+            --app-version "$env:APP_VERSION" `
+            --java-options "-Djpackage.app-version=$env:APP_VERSION" `
+            --java-options "-Dfile.encoding=UTF-8"
+          
+          Remove-Item -Recurse -Force $inputDir
+          
+          Copy-Item "fechar.bat" "dist-app\GestaoMarcenaria\" -Force
+          Copy-Item "Iniciar-Silencioso.vbs" "dist-app\GestaoMarcenaria\" -Force
+          Copy-Item "app.ico" "dist-app\GestaoMarcenaria\" -Force
+          
+          if (!(Test-Path "dist-app\GestaoMarcenaria\data")) {
+            New-Item -ItemType Directory -Path "dist-app\GestaoMarcenaria\data" -Force | Out-Null
+          }
+          if (Test-Path "data\marcenaria.db") {
+            Copy-Item "data\marcenaria.db" "dist-app\GestaoMarcenaria\data\" -Force
+          }
+          Write-Host "Diretório de distribuição criado com sucesso!"
+
+      - name: Compilar Instalador com Inno Setup
+        shell: pwsh
+        run: |
+          if (!(Test-Path "dist-installer")) {
+            New-Item -ItemType Directory -Path "dist-installer" -Force | Out-Null
+          }
+          iscc "/DMyAppVersion=$env:APP_VERSION" setup.iss
+          
+          $installer = Get-ChildItem "dist-installer\*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (!$installer) {
+            throw "O Instalador .exe não foi gerado pelo Inno Setup!"
+          }
+          Write-Host "Instalador gerado com sucesso: $($installer.FullName)"
+          echo "INSTALLER_PATH=$($installer.FullName)" >> $env:GITHUB_ENV
+          echo "INSTALLER_NAME=$($installer.Name)" >> $env:GITHUB_ENV
+
+      - name: Publicar Release no Repositório Público
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GH_RELEASES_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          $repo = $env:TARGET_REPO
+          $tag = $env:APP_TAG
+          $title = "FH Móveis Gestão $tag"
+          $notes = "Atualização oficial $tag do FH Móveis Planejados - Gestão & Orçamentos."
+          
+          Write-Host "Publicando $tag com $($env:INSTALLER_NAME) no repositório $repo..."
+          
+          gh release delete $tag --repo $repo --yes 2>$null || true
+          
+          gh release create $tag "$env:INSTALLER_PATH" `
+            --repo $repo `
+            --title $title `
+            --notes $notes `
+            --latest
+          
+          Write-Host "Release publicada com sucesso!"

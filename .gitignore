@@ -1,0 +1,35 @@
+# Binários e distribuições locais
+dist-app/
+dist-installer/
+dist-app-input/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Backend
+backend/target/
+backend/src/main/resources/static/assets/
+backend/src/main/resources/static/index.html
+backend/src/main/resources/static/vite.svg
+
+# Banco de dados temporários e backups
+data/backups/
+data/*.db-wal
+data/*.db-shm
+data/*.mv.db
+backend/data/
+
+# Logs e arquivos temporários
+*.log
+*.download
+app.log
+err.log
+
+# IDEs e Editores
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
